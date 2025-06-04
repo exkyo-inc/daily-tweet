@@ -1,0 +1,30 @@
+name: Daily Tweet Bot
+
+on:
+  schedule:
+    # 毎週日曜日 09:00 JST (00:00 UTC) に実行
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # 手動実行も可能
+
+jobs:
+  post-tweets:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Build
+      run: go build -o daily-tweet main.go
+      
+    - name: Run bot
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+      run: ./daily-tweet
