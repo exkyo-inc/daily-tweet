@@ -1,14 +1,45 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/cocacola/daily-tweet/internal/model"
 	"github.com/cocacola/daily-tweet/internal/provider"
 )
+
+func postToDiscord(webhookURL string, message string, dryRun bool) error {
+	if dryRun || webhookURL == "" {
+		fmt.Println("[DryRun]", message)
+		return nil
+	}
+
+	payload := struct {
+		Content string `json:"content"`
+	}{Content: message}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(data))
+	if err != nil {
+		return fmt.Errorf("failed to post to webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("webhook returned status %s", resp.Status)
+	}
+
+	return nil
+}
 
 func main() {
 	fmt.Println("Today-in-History Bot")
@@ -52,7 +83,10 @@ func main() {
 			}
 
 			for _, anniversary := range anniversaries {
-				fmt.Printf("[%s] %s: %s\n", anniversary.Source, anniversary.Title, anniversary.Description)
+				msg := fmt.Sprintf("[%s] %s: %s", anniversary.Source, anniversary.Title, anniversary.Description)
+				if err := postToDiscord(config.DiscordWebhookURL, msg, config.DryRun); err != nil {
+					log.Printf("Error posting to Discord: %v", err)
+				}
 			}
 		}
 	}
